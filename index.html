@@ -1,358 +1,91 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Visitors</title>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@700&display=swap" rel="stylesheet"/>
-  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-
-  <!--
-  ================================================================
-  SETUP — only edit the CONFIG section in the script below
-  ================================================================
-
-  COUNTER: Works automatically. No setup needed.
-
-  EMAIL (EmailJS — free at emailjs.com):
-    Your keys are already filled in below!
-    Just make sure notify_email is set to: true
-
-  WHATSAPP (CallMeBot — free):
-    1. Save +34 644 60 49 08 in your contacts
-    2. WhatsApp them: "I allow callmebot to send me messages"
-    3. They reply with your API key
-    4. Paste phone (with country code, no +) + key below
-    5. Set notify_whatsapp: true
-
-  OWNER MODE (skip counting yourself):
-    Open your live site, type the word:  owner  on keyboard
-    Popup appears, enter password:       ownermode
-
-  ⚠️  IMPORTANT — GITHUB REPO NAME:
-    Your repo MUST be named exactly:  rahuljacobj.github.io
-    (Go to repo Settings → rename it if needed)
-    This gives you the URL: https://rahuljacobj.github.io
-  ================================================================
-  -->
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Visitor Counter</title>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg: #060812;
-      --glow: #5b7fff;
-      --glow2: #b06fff;
-      --text: #dde4ff;
-      --muted: #3a4060;
+    body {
+      font-family: Arial, sans-serif;
+      background: #0f172a;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
     }
-
-    html, body { height: 100%; background: var(--bg); overflow: hidden; }
-
-    canvas { position: fixed; inset: 0; z-index: 0; }
-
-    .orb {
-      position: fixed; border-radius: 50%;
-      filter: blur(120px); opacity: 0.15;
-      pointer-events: none; z-index: 0;
-    }
-    .o1 { width: 600px; height: 600px; background: var(--glow);  top: -200px; left: -200px; animation: drift 16s ease-in-out infinite alternate; }
-    .o2 { width: 500px; height: 500px; background: var(--glow2); bottom: -150px; right: -150px; animation: drift 20s ease-in-out infinite alternate-reverse; }
-    @keyframes drift { to { transform: translate(50px, 40px); } }
-
-    .page {
-      position: relative; z-index: 1; height: 100vh;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-    }
-
-    #count-number {
-      font-family: 'Space Mono', monospace;
-      font-size: clamp(6rem, 20vw, 14rem);
-      font-weight: 700;
-      background: linear-gradient(135deg, #8fb3ff 0%, #c8a0ff 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      line-height: 1;
-      letter-spacing: -0.04em;
-      opacity: 0;
-      transform: translateY(30px);
-      animation: rise 0.8s 0.2s cubic-bezier(0.16,1,0.3,1) forwards;
+    .card {
+      background: #1e293b;
+      padding: 40px;
+      border-radius: 16px;
       text-align: center;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
     }
-
-    .label {
-      font-family: 'Space Mono', monospace;
-      font-size: clamp(0.55rem, 1.5vw, 0.75rem);
-      letter-spacing: 0.28em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-top: 0.6rem;
-      opacity: 0;
-      animation: rise 0.6s 0.5s forwards;
+    h1 {
+      margin-bottom: 10px;
     }
-
-    @keyframes rise {
-      to { opacity: 1; transform: translateY(0); }
+    #count {
+      font-size: 48px;
+      margin: 20px 0;
     }
-
     .status {
-      position: fixed; bottom: 1.8rem; left: 50%; transform: translateX(-50%);
-      display: flex; align-items: center; gap: 0.5rem;
-      font-family: 'Space Mono', monospace;
-      font-size: 0.6rem; color: var(--muted); letter-spacing: 0.1em;
-      opacity: 0; animation: rise 0.6s 0.8s forwards; white-space: nowrap;
+      font-size: 14px;
+      opacity: 0.7;
     }
-    .dot {
-      width: 6px; height: 6px; border-radius: 50%;
-      background: #4ade80; box-shadow: 0 0 6px #4ade80;
-      animation: blink 2s infinite; flex-shrink: 0;
-    }
-    .dot.loading { background: #f5c842; box-shadow: 0 0 6px #f5c842; }
-    .dot.error   { background: #f87171; box-shadow: 0 0 6px #f87171; animation: none; }
-    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.35} }
-
-    #owner-badge {
-      display: none; position: fixed; top: 1.5rem; left: 50%; transform: translateX(-50%);
-      font-family: 'Space Mono', monospace; font-size: 0.6rem; letter-spacing: 0.12em;
-      color: #f5c842; background: rgba(245,200,66,0.07);
-      border: 1px solid rgba(245,200,66,0.2); border-radius: 100px;
-      padding: 0.35rem 1rem; white-space: nowrap;
-    }
-
-    #modal {
-      display: none; position: fixed; inset: 0;
-      background: rgba(6,8,18,0.88); backdrop-filter: blur(10px);
-      z-index: 200; align-items: center; justify-content: center;
-    }
-    #modal.open { display: flex; }
-    .mbox {
-      background: #0d1020; border: 1px solid #1e2340;
-      border-radius: 18px; padding: 2.5rem; width: 320px;
-      text-align: center; font-family: 'Space Mono', monospace;
-    }
-    .mbox h3 { color: var(--text); font-size: 1rem; margin-bottom: 0.4rem; }
-    .mbox p  { color: var(--muted); font-size: 0.62rem; line-height: 1.8; margin-bottom: 1.5rem; }
-    .mbox input {
-      width: 100%; background: rgba(255,255,255,0.03);
-      border: 1px solid #1e2340; border-radius: 8px;
-      padding: 0.7rem 1rem; color: var(--text);
-      font-family: 'Space Mono', monospace; font-size: 0.8rem;
-      outline: none; margin-bottom: 1rem; text-align: center;
-    }
-    .mbox input:focus { border-color: var(--glow); }
-    .mbtn {
-      width: 100%; padding: 0.7rem;
-      background: linear-gradient(135deg, var(--glow), var(--glow2));
-      border: none; border-radius: 8px; color: #fff;
-      font-family: 'Space Mono', monospace; font-size: 0.78rem;
-      font-weight: 700; cursor: pointer; letter-spacing: 0.06em;
-    }
-    .mbtn:hover { opacity: 0.85; }
-    #mresult { font-size: 0.62rem; margin-top: 0.6rem; min-height: 1em; }
-    #mresult.ok  { color: #4ade80; }
-    #mresult.err { color: #f87171; }
-    .mcancel {
-      display: block; margin-top: 0.75rem; font-size: 0.58rem;
-      color: var(--muted); cursor: pointer; letter-spacing: 0.1em; text-transform: uppercase;
-    }
-    .mcancel:hover { color: var(--text); }
   </style>
 </head>
 <body>
 
-<canvas id="c"></canvas>
-<div class="o1 orb"></div>
-<div class="o2 orb"></div>
-
-<div id="modal">
-  <div class="mbox">
-    <h3>🔒 Owner Mode</h3>
-    <p>Mark this device as the owner.<br/>Your visits will not be counted.</p>
-    <input type="password" id="mpass" placeholder="enter password" autocomplete="off"/>
-    <button class="mbtn" onclick="checkPass()">Confirm</button>
-    <div id="mresult"></div>
-    <span class="mcancel" onclick="closeModal()">cancel</span>
-  </div>
-</div>
-
-<div id="owner-badge">👤 OWNER — NOT COUNTED</div>
-
-<div class="page">
-  <div id="count-number">—</div>
-  <div class="label">visitors</div>
-</div>
-
-<div class="status">
-  <div class="dot loading" id="sdot"></div>
-  <span id="stxt">connecting...</span>
+<div class="card">
+  <h1>Visitors</h1>
+  <div id="count">Loading...</div>
+  <div class="status" id="status">Connecting...</div>
 </div>
 
 <script>
-const CONFIG = {
-  namespace: "rahuljacobj",
-  key:       "site-visitors-1",
+// ===== SIMPLE & RELIABLE COUNTER (NO FIREBASE NEEDED) =====
 
-  notify_email:     true,
-  emailjs_pubkey:   "Pmrf8JtM1asiviU-1",
-  emailjs_service:  "service_1vme3c1",
-  emailjs_template: "template_txhswhk",
+const namespace = "rahuljacobj"; // change if needed
+const key = "visitor-count";
 
-  notify_whatsapp: false,
-  wa_phone: "YOUR_PHONE",
-  wa_key:   "YOUR_KEY",
+const countEl = document.getElementById("count");
+const statusEl = document.getElementById("status");
 
-  owner_pass: "ownermode",
-};
-
-const numEl   = document.getElementById('count-number');
-const sdot    = document.getElementById('sdot');
-const stxt    = document.getElementById('stxt');
-const isOwner = localStorage.getItem('owner') === '1';
-
-function setStatus(state, msg) {
-  sdot.className = 'dot' + (state !== 'ok' ? ' ' + state : '');
-  stxt.textContent = msg;
-}
-
-function ordinal(n) {
-  const s=['th','st','nd','rd'], v=n%100;
-  return n+(s[(v-20)%10]||s[v]||s[0]);
-}
-
-function animateNum(target) {
-  const from = parseInt(numEl.textContent.replace(/[^0-9]/g,'')) || 0;
-  const dur = 1400, t0 = performance.now();
-  (function tick(now) {
-    const p = Math.min((now-t0)/dur, 1);
-    const ease = 1-Math.pow(1-p, 4);
-    numEl.textContent = Math.round(from+(target-from)*ease).toLocaleString();
-    if (p<1) requestAnimationFrame(tick);
-    else numEl.textContent = target.toLocaleString();
-  })(t0);
-}
-
-async function hitCounter() {
-  const url = `https://api.countapi.xyz/hit/${CONFIG.namespace}/${CONFIG.key}`;
-  const r = await fetch(url);
-  if (!r.ok) throw new Error(r.status);
-  const d = await r.json();
-  return d.value;
-}
-
-async function getCounter() {
-  const url = `https://api.countapi.xyz/get/${CONFIG.namespace}/${CONFIG.key}`;
-  const r = await fetch(url);
-  if (!r.ok) throw new Error(r.status);
-  const d = await r.json();
-  return d.value;
-}
-
-async function init() {
-  if (isOwner) {
-    document.getElementById('owner-badge').style.display = 'block';
-    setStatus('loading', 'owner mode...');
-    try {
-      const count = await getCounter();
-      animateNum(count);
-      setStatus('ok', 'owner — not counted');
-    } catch(e) {
-      numEl.textContent = '?';
-      setStatus('error', 'could not connect');
-    }
-    return;
-  }
-
-  setStatus('loading', 'counting your visit...');
+async function updateCounter() {
   try {
-    const count = await hitCounter();
-    animateNum(count);
-    setStatus('ok', `visitor ${ordinal(count)}`);
+    statusEl.textContent = "Counting your visit...";
 
-    const now = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+    const res = await fetch(`https://api.counterapi.dev/v1/${namespace}/${key}/up`);
+    const data = await res.json();
 
-    if (CONFIG.notify_email) {
-      try {
-        emailjs.init(CONFIG.emailjs_pubkey);
-        await emailjs.send(CONFIG.emailjs_service, CONFIG.emailjs_template, {
-          visitor_count: count,
-          visit_time: now,
-          ordinal_count: ordinal(count),
-        });
-      } catch(e) { console.warn('Email failed', e); }
+    if (!data || typeof data.count !== "number") {
+      throw new Error("Invalid response");
     }
 
-    if (CONFIG.notify_whatsapp && CONFIG.wa_key !== 'YOUR_KEY') {
-      try {
-        const msg = encodeURIComponent(`New visitor! #${count} at ${now}`);
-        await fetch(`https://api.callmebot.com/whatsapp.php?phone=${CONFIG.wa_phone}&text=${msg}&apikey=${CONFIG.wa_key}`, { mode:'no-cors' });
-      } catch(e) {}
+    countEl.textContent = data.count.toLocaleString();
+    statusEl.textContent = "Visit counted successfully";
+
+  } catch (err) {
+    console.error(err);
+
+    // fallback (read-only)
+    try {
+      const res = await fetch(`https://api.counterapi.dev/v1/${namespace}/${key}`);
+      const data = await res.json();
+
+      countEl.textContent = data.count || "0";
+      statusEl.textContent = "Showing saved count (write failed)";
+
+    } catch (err2) {
+      countEl.textContent = "Error";
+      statusEl.textContent = "Failed to connect. Check internet or hosting.";
     }
-
-  } catch(e) {
-    numEl.textContent = '?';
-    setStatus('error', 'connection failed');
-    console.error('Counter error:', e);
   }
 }
 
-function openModal()  { document.getElementById('modal').classList.add('open'); }
-function closeModal() {
-  document.getElementById('modal').classList.remove('open');
-  document.getElementById('mpass').value = '';
-  document.getElementById('mresult').textContent = '';
-}
-function checkPass() {
-  const r = document.getElementById('mresult');
-  if (document.getElementById('mpass').value === CONFIG.owner_pass) {
-    localStorage.setItem('owner','1');
-    r.className='ok'; r.textContent='✓ Owner mode enabled!';
-    setTimeout(()=>{ closeModal(); location.reload(); }, 1400);
-  } else {
-    r.className='err'; r.textContent='✗ Wrong password.';
-  }
-}
-document.getElementById('mpass').addEventListener('keydown', e=>{ if(e.key==='Enter') checkPass(); });
-
-// Secret trigger: type "owner"
-(function(){
-  let buf='', timer;
-  document.addEventListener('keydown', e=>{
-    if(e.target.tagName==='INPUT') return;
-    buf += e.key.toLowerCase(); buf = buf.slice(-5);
-    clearTimeout(timer); timer = setTimeout(()=>buf='', 2000);
-    if(buf==='owner'){ buf=''; openModal(); }
-  });
-})();
-
-// Starfield
-(function(){
-  const c=document.getElementById('c'), x=c.getContext('2d');
-  let s=[];
-  function resize(){ c.width=innerWidth; c.height=innerHeight; }
-  function make(){
-    s=[];
-    for(let i=0;i<160;i++) s.push({
-      x:Math.random()*c.width, y:Math.random()*c.height,
-      r:Math.random()*1.2+0.2, ph:Math.random()*Math.PI*2,
-      sp:Math.random()*0.004+0.001
-    });
-  }
-  function draw(t){
-    x.clearRect(0,0,c.width,c.height);
-    s.forEach(p=>{
-      const a=0.25+0.5*Math.sin(t*p.sp+p.ph);
-      x.beginPath(); x.arc(p.x,p.y,p.r,0,Math.PI*2);
-      x.fillStyle=`rgba(190,210,255,${a})`; x.fill();
-    });
-    requestAnimationFrame(draw);
-  }
-  window.addEventListener('resize',()=>{resize();make();});
-  resize(); make(); requestAnimationFrame(draw);
-})();
-
-init();
+updateCounter();
 </script>
+
 </body>
 </html>
