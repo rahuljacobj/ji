@@ -15,13 +15,13 @@
 <body>
 
 <div id="count">Loading...</div>
-  <div class="status" id="status">.</div>
+  <div class="status" id="status">Connecting to Firebase...</div>
 </div>
 
 <!-- Firebase SDK -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+  import { getDatabase, ref, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
   // 🔴 REPLACE WITH YOUR FIREBASE CONFIG
   const firebaseConfig = {
@@ -44,17 +44,19 @@
     try {
       const counterRef = ref(db, 'visits');
 
-      const snapshot = await get(counterRef);
-      let count = snapshot.exists() ? snapshot.val() : 0;
+      const result = await runTransaction(counterRef, (current) => {
+        return (current || 0) + 1;
+      });
 
-      count = count + 1;
-
-      await set(counterRef, count);
+      const count = result.snapshot.val();
 
       countEl.textContent = count.toLocaleString();
-      
 
     } catch (error) {
+      console.error(error);
+      countEl.textContent = "Error";
+    }
+  } catch (error) {
       console.error(error);
       countEl.textContent = "Error";
       
