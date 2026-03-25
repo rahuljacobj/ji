@@ -3,28 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Visitor Counter</title>
+  <title>Visitor Counter (Firebase)</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #0f172a;
-      color: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      margin: 0;
-    }
-    .card {
-      background: #1e293b;
-      padding: 40px;
-      border-radius: 16px;
-      text-align: center;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
-    }
-    h1 { margin-bottom: 10px; }
-    #count { font-size: 48px; margin: 20px 0; }
-    .status { font-size: 14px; opacity: 0.7; }
+    body { font-family: Arial, sans-serif; background:#0f172a; color:#fff; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; }
+    .card { background:#1e293b; padding:40px; border-radius:16px; text-align:center; box-shadow:0 10px 30px rgba(0,0,0,.4); }
+    h1 { margin-bottom:10px; }
+    #count { font-size:48px; margin:20px 0; }
+    .status { font-size:14px; opacity:.7; }
   </style>
 </head>
 <body>
@@ -32,64 +17,53 @@
 <div class="card">
   <h1>Visitors</h1>
   <div id="count">Loading...</div>
-  <div class="status" id="status">Connecting...</div>
+  <div class="status" id="status">Connecting to Firebase...</div>
 </div>
 
-<script>
-// ===== BULLETPROOF COUNTER (WORKS EVEN IF APIs FAIL) =====
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-const namespace = "rahuljacobj";
-const key = "visitor-count";
+  // 🔴 REPLACE WITH YOUR FIREBASE CONFIG
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    databaseURL: "https://counter-4d108-default-rtdb.asia-southeast1.firebasedatabase.app/",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
 
-const countEl = document.getElementById("count");
-const statusEl = document.getElementById("status");
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
 
-async function updateCounter() {
-  try {
-    statusEl.textContent = "Trying primary server...";
+  const countEl = document.getElementById("count");
+  const statusEl = document.getElementById("status");
 
-    // TRY 1: countapi.xyz
-    let res = await fetch(`https://api.countapi.xyz/hit/${namespace}/${key}`);
-    let data = await res.json();
-
-    if (data && typeof data.value === "number") {
-      countEl.textContent = data.value.toLocaleString();
-      statusEl.textContent = "Live count (primary server)";
-      return;
-    }
-
-    throw new Error("Primary failed");
-
-  } catch (e1) {
+  async function updateCounter() {
     try {
-      statusEl.textContent = "Trying backup server...";
+      const counterRef = ref(db, 'visits');
 
-      // TRY 2: counterapi.dev
-      let res = await fetch(`https://api.counterapi.dev/v1/${namespace}/${key}/up`);
-      let data = await res.json();
+      const snapshot = await get(counterRef);
+      let count = snapshot.exists() ? snapshot.val() : 0;
 
-      if (data && typeof data.count === "number") {
-        countEl.textContent = data.count.toLocaleString();
-        statusEl.textContent = "Live count (backup server)";
-        return;
-      }
+      count = count + 1;
 
-      throw new Error("Backup failed");
+      await set(counterRef, count);
 
-    } catch (e2) {
+      countEl.textContent = count.toLocaleString();
+      statusEl.textContent = "Live count (Firebase)";
 
-      // FINAL FALLBACK: localStorage (ALWAYS WORKS)
-      let localCount = localStorage.getItem("visitor_count");
-      localCount = localCount ? parseInt(localCount) + 1 : 1;
-      localStorage.setItem("visitor_count", localCount);
-
-      countEl.textContent = localCount.toLocaleString();
-      statusEl.textContent = "Offline mode (device-based count)";
+    } catch (error) {
+      console.error(error);
+      countEl.textContent = "Error";
+      statusEl.textContent = "Firebase connection failed";
     }
   }
-}
 
-updateCounter();
+  updateCounter();
 </script>
 
 </body>
