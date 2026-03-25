@@ -6,24 +6,41 @@
   <title>hello</title>
   <style>
     body { font-family: Arial, sans-serif; background:#0f172a; color:#fff; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; }
-    
-    
-    #count { font-size:48px; margin:20px 0; }
-    
+    #count { font-size:64px; }
+
+    /* hidden owner panel */
+    #ownerPanel {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #1e293b;
+      padding: 15px;
+      border-radius: 10px;
+      display: none;
+    }
+
+    button {
+      padding: 8px 12px;
+      border: none;
+      border-radius: 6px;
+      background: #ef4444;
+      color: white;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
 
 <div id="count">Loading...</div>
-  <div class="status" id="status">Connecting to Firebase...</div>
+
+<div id="ownerPanel">
+  <button onclick="resetCounter()">Reset to 0</button>
 </div>
 
-<!-- Firebase SDK -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getDatabase, ref, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+  import { getDatabase, ref, runTransaction, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-  // 🔴 REPLACE WITH YOUR FIREBASE CONFIG
   const firebaseConfig = {
     apiKey: "AIzaSyBKtRIyc5oKSGMzVMDBNWW9WIT4WL6QWfY",
     authDomain: "counter-4d108.firebaseapp.com",
@@ -38,7 +55,7 @@
   const db = getDatabase(app);
 
   const countEl = document.getElementById("count");
-  
+  const ownerPanel = document.getElementById("ownerPanel");
 
   async function updateCounter() {
     try {
@@ -49,19 +66,34 @@
       });
 
       const count = result.snapshot.val();
-
       countEl.textContent = count.toLocaleString();
 
     } catch (error) {
       console.error(error);
       countEl.textContent = "Error";
     }
-  } catch (error) {
-      console.error(error);
-      countEl.textContent = "Error";
-      
+  }
+
+  async function resetCounter() {
+    try {
+      const counterRef = ref(db, 'visits');
+      await set(counterRef, 0);
+      countEl.textContent = "0";
+    } catch (e) {
+      console.error(e);
     }
   }
+
+  // secret owner mode: type "owner"
+  let buffer = "";
+  document.addEventListener("keydown", (e) => {
+    buffer += e.key.toLowerCase();
+    buffer = buffer.slice(-5);
+
+    if (buffer === "owner") {
+      ownerPanel.style.display = "block";
+    }
+  });
 
   updateCounter();
 </script>
