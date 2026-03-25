@@ -22,17 +22,9 @@
       text-align: center;
       box-shadow: 0 10px 30px rgba(0,0,0,0.4);
     }
-    h1 {
-      margin-bottom: 10px;
-    }
-    #count {
-      font-size: 48px;
-      margin: 20px 0;
-    }
-    .status {
-      font-size: 14px;
-      opacity: 0.7;
-    }
+    h1 { margin-bottom: 10px; }
+    #count { font-size: 48px; margin: 20px 0; }
+    .status { font-size: 14px; opacity: 0.7; }
   </style>
 </head>
 <body>
@@ -44,9 +36,9 @@
 </div>
 
 <script>
-// ===== SIMPLE & RELIABLE COUNTER (NO FIREBASE NEEDED) =====
+// ===== BULLETPROOF COUNTER (WORKS EVEN IF APIs FAIL) =====
 
-const namespace = "rahuljacobj"; // change if needed
+const namespace = "rahuljacobj";
 const key = "visitor-count";
 
 const countEl = document.getElementById("count");
@@ -54,32 +46,45 @@ const statusEl = document.getElementById("status");
 
 async function updateCounter() {
   try {
-    statusEl.textContent = "Counting your visit...";
+    statusEl.textContent = "Trying primary server...";
 
-    const res = await fetch(`https://api.countapi.xyz/hit/${namespace}/${key}`);
-    const data = await res.json();
+    // TRY 1: countapi.xyz
+    let res = await fetch(`https://api.countapi.xyz/hit/${namespace}/${key}`);
+    let data = await res.json();
 
-    if (!data || typeof data.count !== "number") {
-      throw new Error("Invalid response");
+    if (data && typeof data.value === "number") {
+      countEl.textContent = data.value.toLocaleString();
+      statusEl.textContent = "Live count (primary server)";
+      return;
     }
 
-    countEl.textContent = data.count.toLocaleString();
-    statusEl.textContent = "Visit counted successfully";
+    throw new Error("Primary failed");
 
-  } catch (err) {
-    console.error(err);
-
-    // fallback (read-only)
+  } catch (e1) {
     try {
-      const res = await fetch(`https://api.countapi.xyz/get/${namespace}/${key}`);
-      const data = await res.json();
+      statusEl.textContent = "Trying backup server...";
 
-      countEl.textContent = data.count || "0";
-      statusEl.textContent = "Showing saved count (write failed)";
+      // TRY 2: counterapi.dev
+      let res = await fetch(`https://api.counterapi.dev/v1/${namespace}/${key}/up`);
+      let data = await res.json();
 
-    } catch (err2) {
-      countEl.textContent = "Error";
-      statusEl.textContent = "Failed to connect. Check internet or hosting.";
+      if (data && typeof data.count === "number") {
+        countEl.textContent = data.count.toLocaleString();
+        statusEl.textContent = "Live count (backup server)";
+        return;
+      }
+
+      throw new Error("Backup failed");
+
+    } catch (e2) {
+
+      // FINAL FALLBACK: localStorage (ALWAYS WORKS)
+      let localCount = localStorage.getItem("visitor_count");
+      localCount = localCount ? parseInt(localCount) + 1 : 1;
+      localStorage.setItem("visitor_count", localCount);
+
+      countEl.textContent = localCount.toLocaleString();
+      statusEl.textContent = "Offline mode (device-based count)";
     }
   }
 }
