@@ -3,20 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Visitor Counter (Firebase)</title>
+  <title>hello</title>
   <style>
     body { font-family: Arial, sans-serif; background:#0f172a; color:#fff; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; }
-    .card { background:#1e293b; padding:40px; border-radius:16px; text-align:center; box-shadow:0 10px 30px rgba(0,0,0,.4); }
-    h1 { margin-bottom:10px; }
+    
+    
     #count { font-size:48px; margin:20px 0; }
-    .status { font-size:14px; opacity:.7; }
+    
   </style>
 </head>
 <body>
 
-<div class="card">
-  <h1>Visitors</h1>
-  <div id="count">Loading...</div>
+<div id="count">Loading...</div>
   <div class="status" id="status">Connecting to Firebase...</div>
 </div>
 
@@ -40,7 +38,7 @@
   const db = getDatabase(app);
 
   const countEl = document.getElementById("count");
-  const statusEl = document.getElementById("status");
+  
 
   async function updateCounter() {
     try {
@@ -54,12 +52,12 @@
       await set(counterRef, count);
 
       countEl.textContent = count.toLocaleString();
-      statusEl.textContent = "Live count (Firebase)";
+      
 
     } catch (error) {
       console.error(error);
       countEl.textContent = "Error";
-      statusEl.textContent = "Firebase connection failed";
+      
     }
   }
 
