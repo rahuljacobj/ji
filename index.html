@@ -56,7 +56,7 @@ async function updateCounter() {
   try {
     statusEl.textContent = "Counting your visit...";
 
-    const res = await fetch(`https://api.counterapi.dev/v1/${namespace}/${key}/up`);
+    const res = await fetch(`https://api.countapi.xyz/hit/${namespace}/${key}`);
     const data = await res.json();
 
     if (!data || typeof data.count !== "number") {
@@ -71,7 +71,7 @@ async function updateCounter() {
 
     // fallback (read-only)
     try {
-      const res = await fetch(`https://api.counterapi.dev/v1/${namespace}/${key}`);
+      const res = await fetch(`https://api.countapi.xyz/get/${namespace}/${key}`);
       const data = await res.json();
 
       countEl.textContent = data.count || "0";
