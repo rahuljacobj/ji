@@ -79,7 +79,14 @@
       const counterRef = ref(db, 'visits');
       await set(counterRef, 0);
       countEl.textContent = "0";
+      console.log("Counter reset to 0");
     } catch (e) {
+      console.error(e);
+    }
+  }
+
+  // make it accessible to button
+  window.resetCounter = resetCounter; catch (e) {
       console.error(e);
     }
   }
