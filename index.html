@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chat</title>
+
+<!-- EmailJS -->
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<!-- Firebase Realtime DB (compat) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --teal:       #00a884;
+  --teal-dark:  #008c6e;
+  --header-bg:  #1f2c34;
+  --bubble-me:  #005c4b;
+  --bubble-them:#1e2a30;
+  --text:       #e9edef;
+  --subtext:    #8696a0;
+  --bg:         #0b141a;
+  --panel-bg:   #111b21;
+  --border:     #2a3942;
+  --font: 'Segoe UI', system-ui, sans-serif;
+}
+html, body { height: 100%; font-family: var(--font); background: var(--bg); color: var(--text); overflow: hidden; }
+
+/* LOCK */
+#lockScreen {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  height: 100vh; background: linear-gradient(135deg, #0b141a 0%, #1f2c34 100%); gap: 18px;
+}
+.lock-icon  { font-size: 60px; }
+.lock-title { font-size: 22px; font-weight: 600; }
+.lock-sub   { font-size: 13px; color: var(--subtext); }
+#lockPinInput {
+  width: 220px; padding: 14px 16px; background: #1f2c34;
+  border: 1px solid var(--border); border-radius: 24px;
+  color: var(--text); font-size: 20px; text-align: center;
+  letter-spacing: 8px; outline: none;
+}
+#lockPinInput:focus { border-color: var(--teal); }
+#lockUnlockBtn {
+  padding: 12px 40px; background: var(--teal); border: none;
+  border-radius: 24px; color: #fff; font-size: 15px; font-weight: 600;
+  cursor: pointer; transition: background .2s;
+}
+#lockUnlockBtn:hover { background: var(--teal-dark); }
+#lockError { color: #f66; font-size: 13px; display: none; }
+
+/* CHAT */
+#chatApp { display: flex; flex-direction: column; height: 100vh; max-width: 900px; margin: 0 auto; }
+
+/* HEADER */
+.chat-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 16px; background: var(--header-bg);
+  border-bottom: 1px solid var(--border); flex-shrink: 0; z-index: 10;
+}
+#contactDp {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: var(--teal) center/cover no-repeat;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 19px; font-weight: 700; color: #fff; flex-shrink: 0; cursor: pointer;
+}
+.header-info { flex: 1; overflow: hidden; }
+#contactName { font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.header-sub  { font-size: 12px; color: var(--teal); }
+.header-actions button {
+  background: none; border: none; color: var(--subtext);
+  font-size: 22px; cursor: pointer; padding: 7px 9px; border-radius: 50%;
+  transition: background .15s, color .15s;
+}
+.header-actions button:hover { background: rgba(255,255,255,.07); color: var(--text); }
+
+/* MESSAGES */
+#chatBg { flex: 1; overflow-y: auto; background-color: var(--bg); scroll-behavior: smooth; }
+#chatBg::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .03;
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/svg%3E");
+}
+#messages { padding: 12px 16px 8px; display: flex; flex-direction: column; gap: 3px; min-height: 100%; }
+
+.date-chip {
+  align-self: center; background: rgba(11,20,26,.8); border: 1px solid var(--border);
+  border-radius: 8px; padding: 4px 12px; font-size: 12px; color: var(--subtext);
+  margin: 10px 0 6px;
+}
+.msg-wrap      { display: flex; }
+.msg-wrap.me   { justify-content: flex-end; }
+.msg-wrap.them { justify-content: flex-start; }
+.bubble {
+  max-width: 66%; padding: 7px 11px 22px; border-radius: 8px;
+  position: relative; word-break: break-word; font-size: 14.5px;
+  line-height: 1.45; box-shadow: 0 1px 2px rgba(0,0,0,.35);
+  animation: pop .15s ease;
+}
+@keyframes pop { from { opacity:0; transform:scale(.95); } to { opacity:1; transform:scale(1); } }
+.bubble-me   { background: var(--bubble-me);   border-bottom-right-radius: 2px; }
+.bubble-them { background: var(--bubble-them); border-bottom-left-radius:  2px; }
+.msg-time { position: absolute; bottom: 5px; right: 9px; font-size: 11px; color: var(--subtext); white-space: nowrap; }
+.tick.read { color: #53bdeb; }
+.media-img { max-width: 100%; max-height: 260px; border-radius: 6px; display: block; cursor: zoom-in; }
+.media-vid { max-width: 100%; max-height: 260px; border-radius: 6px; display: block; }
+audio { width: 100%; min-width: 200px; border-radius: 6px; }
+.file-link { color: #5ab3ff; text-decoration: none; word-break: break-all; }
+.file-link:hover { text-decoration: underline; }
+.chat-link  { color: #5ab3ff; }
+.media-caption { font-size: 13px; margin-top: 5px; color: #aaa; }
+
+/* INPUT */
+.input-bar {
+  display: flex; align-items: flex-end; gap: 6px;
+  padding: 8px 10px; background: var(--header-bg);
+  border-top: 1px solid var(--border); flex-shrink: 0;
+}
+.input-bar button {
+  background: none; border: none; color: var(--subtext);
+  font-size: 22px; cursor: pointer; padding: 7px; border-radius: 50%;
+  transition: background .15s, color .15s; flex-shrink: 0; line-height: 1;
+}
+.input-bar button:hover { background: rgba(255,255,255,.07); color: var(--text); }
+#textInput {
+  flex: 1; background: #2a3942; border: none; border-radius: 8px;
+  padding: 10px 14px; color: var(--text); font-size: 14.5px;
+  font-family: var(--font); resize: none; outline: none;
+  max-height: 120px; line-height: 1.45; overflow-y: auto;
+}
+#textInput::placeholder { color: var(--subtext); }
+#sendBtn {
+  width: 44px; height: 44px; background: var(--teal); border: none;
+  border-radius: 50%; color: #fff; font-size: 19px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: background .2s, transform .1s;
+}
+#sendBtn:hover  { background: var(--teal-dark); }
+#sendBtn:active { transform: scale(.92); }
+#audioBtn.recording { color: #f44; animation: pulse .7s infinite; }
+@keyframes pulse { 0%,100%{ opacity:1; } 50%{ opacity:.4; } }
+
+/* SETTINGS */
+#settingsOverlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:100; }
+#settingsPanel {
+  position:fixed; top:0; right:-340px; width:300px; height:100vh;
+  background:var(--panel-bg); z-index:101; transition:right .28s ease;
+  display:flex; flex-direction:column; box-shadow:-4px 0 28px rgba(0,0,0,.6); overflow-y:auto;
+}
+#settingsPanel.open { right:0; }
+.settings-header { padding:20px 16px 14px; background:var(--header-bg); font-size:17px; font-weight:600; border-bottom:1px solid var(--border); flex-shrink:0; }
+.settings-section { padding:16px; border-bottom:1px solid var(--border); }
+.settings-section label { display:block; font-size:11px; color:var(--teal); font-weight:700; text-transform:uppercase; letter-spacing:.6px; margin-bottom:8px; }
+.settings-section input[type="text"],
+.settings-section input[type="password"] {
+  width:100%; padding:10px 12px; background:#2a3942;
+  border:1px solid var(--border); border-radius:8px;
+  color:var(--text); font-size:14px; outline:none;
+}
+.settings-section input:focus { border-color:var(--teal); }
+.settings-section input[type="file"]  { font-size:13px; color:var(--subtext); width:100%; }
+.settings-section input[type="color"] { width:100%; height:42px; border:1px solid var(--border); border-radius:8px; background:none; cursor:pointer; padding:2px; }
+.settings-hint { font-size:12px; color:var(--subtext); margin-top:5px; }
+.btn-save   { margin:14px 16px 6px; padding:12px; background:var(--teal); border:none; border-radius:8px; color:#fff; font-size:15px; font-weight:600; cursor:pointer; width:calc(100% - 32px); }
+.btn-save:hover { background:var(--teal-dark); }
+.btn-danger { margin:0 16px 16px; padding:12px; background:#2a1515; border:1px solid #6a2020; border-radius:8px; color:#f88; font-size:15px; font-weight:600; cursor:pointer; width:calc(100% - 32px); }
+.btn-danger:hover { background:#3a1a1a; }
+
+/* LIGHTBOX */
+#lightbox { display:none; position:fixed; inset:0; background:rgba(0,0,0,.94); z-index:200; align-items:center; justify-content:center; }
+#lbImg { max-width:92vw; max-height:88vh; border-radius:8px; object-fit:contain; }
+#lightboxClose { position:absolute; top:14px; right:18px; background:none; border:none; color:#fff; font-size:34px; cursor:pointer; line-height:1; }
+
+/* TOAST */
+#toast { position:fixed; bottom:78px; left:50%; transform:translateX(-50%) translateY(16px); background:#1f2c34; border:1px solid var(--border); border-radius:10px; padding:10px 20px; font-size:13px; color:var(--text); opacity:0; transition:opacity .3s,transform .3s; z-index:300; pointer-events:none; white-space:nowrap; }
+#toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+::-webkit-scrollbar { width:5px; } ::-webkit-scrollbar-track { background:transparent; } ::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+@media(max-width:500px){ .bubble{ max-width:84%; } }
+</style>
+</head>
+<body>
+
+<!-- LOCK -->
+<div id="lockScreen">
+  <div class="lock-icon">🔒</div>
+  <div class="lock-title">Chat is locked</div>
+  <div class="lock-sub">Enter your PIN to continue</div>
+  <input id="lockPinInput" type="password" inputmode="numeric" maxlength="8" placeholder="••••" autocomplete="off" />
+  <button id="lockUnlockBtn">Unlock</button>
+  <span id="lockError">Wrong PIN — try again.</span>
+</div>
+
+<!-- CHAT -->
+<div id="chatApp" style="display:none">
+  <div class="chat-header">
+    <div id="contactDp">K</div>
+    <div class="header-info">
+      <div id="contactName">Kushmitha</div>
+      <div class="header-sub">tap ⋮ to open settings</div>
+    </div>
+    <div class="header-actions">
+      <button id="menuBtn" title="Settings">⋮</button>
+    </div>
+  </div>
+
+  <div id="chatBg">
+    <div id="messages"></div>
+  </div>
+
+  <div class="input-bar">
+    <button id="attachBtn" title="Attach image / video / file">📎</button>
+    <input id="fileInput" type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.zip,.txt" multiple style="display:none" />
+    <textarea id="textInput" rows="1" placeholder="Type a message"
+      oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+    <button id="audioBtn" title="Hold to record voice note">🎙</button>
+    <button id="sendBtn">➤</button>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div id="settingsOverlay"></div>
+<div id="settingsPanel">
+  <div class="settings-header">⚙️ Settings</div>
+  <div class="settings-section">
+    <label>Contact Name</label>
+    <input id="settingsName" type="text" placeholder="Kushmitha" />
+  </div>
+  <div class="settings-section">
+    <label>Profile Photo (DP)</label>
+    <input id="settingsDpFile" type="file" accept="image/*" />
+    <p class="settings-hint">Changes Kushmitha's display picture</p>
+  </div>
+  <div class="settings-section">
+    <label>Chat Background — Image</label>
+    <input id="settingsBgFile" type="file" accept="image/*" />
+  </div>
+  <div class="settings-section">
+    <label>Chat Background — Color</label>
+    <input id="settingsBgColor" type="color" value="#0b141a" />
+  </div>
+  <div class="settings-section">
+    <label>Lock PIN</label>
+    <input id="settingsPin" type="password" inputmode="numeric" maxlength="8" placeholder="Set a numeric PIN" autocomplete="new-password" />
+    <p class="settings-hint">Leave blank to disable locking</p>
+  </div>
+  <button class="btn-save" id="settingsSaveBtn">💾 Save Settings</button>
+  <button class="btn-danger" id="lockNowBtn">🔒 Lock Chat Now</button>
+</div>
+
+<!-- LIGHTBOX -->
+<div id="lightbox">
+  <button id="lightboxClose">✕</button>
+  <img id="lbImg" src="" alt="preview" />
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════
+//  🔧 YOUR CONFIGURATION — fill these values in
+// ══════════════════════════════════════════════
+const CONFIG = {
+  firebase: {
+    apiKey:            "REPLACE_FIREBASE_API_KEY",
+    authDomain:        "REPLACE_AUTH_DOMAIN",
+    databaseURL:       "REPLACE_DATABASE_URL",
+    projectId:         "REPLACE_PROJECT_ID",
+    storageBucket:     "REPLACE_STORAGE_BUCKET",
+    messagingSenderId: "REPLACE_SENDER_ID",
+    appId:             "REPLACE_APP_ID"
+  },
+  emailjs: {
+    serviceId:  "REPLACE_EMAILJS_SERVICE_ID",
+    templateId: "REPLACE_EMAILJS_TEMPLATE_ID",
+    publicKey:  "REPLACE_EMAILJS_PUBLIC_KEY"
+  },
+  imgbbKey: "REPLACE_IMGBB_KEY"   // free key from https://api.imgbb.com
+};
+// ══════════════════════════════════════════════
+
+firebase.initializeApp(CONFIG.firebase);
+const db = firebase.database();
+emailjs.init(CONFIG.emailjs.publicKey);
+
+const $ = id => document.getElementById(id);
+
+let S = Object.assign({
+  contactName:"Kushmitha", contactDp:"", background:"#0b141a", pin:"", locked:false
+}, JSON.parse(localStorage.getItem("chatSettings")||"{}"));
+const saveS = () => localStorage.setItem("chatSettings", JSON.stringify(S));
+
+function applySettings() {
+  $("contactName").textContent = S.contactName;
+  const dp = $("contactDp");
+  if (S.contactDp) { dp.style.backgroundImage = `url(${S.contactDp})`; dp.textContent = ""; }
+  else { dp.style.backgroundImage = "none"; dp.textContent = S.contactName.charAt(0).toUpperCase(); }
+  const bg = $("chatBg").style;
+  if (S.background.startsWith("#") || S.background.startsWith("rgb")) {
+    bg.backgroundColor = S.background; bg.backgroundImage = "none";
+  } else {
+    bg.backgroundImage = `url(${S.background})`; bg.backgroundSize = "cover";
+    bg.backgroundPosition = "center"; bg.backgroundColor = "";
+  }
+}
+
+/* ── Lock ── */
+function checkLock() {
+  if (S.locked && S.pin) {
+    $("lockScreen").style.display = "flex"; $("chatApp").style.display = "none";
+  } else {
+    $("lockScreen").style.display = "none"; $("chatApp").style.display = "flex";
+    startListening();
+  }
+}
+$("lockUnlockBtn").addEventListener("click", () => {
+  if ($("lockPinInput").value === S.pin) {
+    S.locked = false; saveS();
+    $("lockScreen").style.display = "none"; $("chatApp").style.display = "flex";
+    $("lockError").style.display = "none"; $("lockPinInput").value = "";
+    startListening();
+  } else { $("lockError").style.display = "block"; $("lockPinInput").value = ""; }
+});
+$("lockPinInput").addEventListener("keydown", e => { if(e.key==="Enter") $("lockUnlockBtn").click(); });
+
+/* ── Settings ── */
+$("menuBtn").addEventListener("click", openSettings);
+$("contactDp").addEventListener("click", openSettings);
+function openSettings() {
+  $("settingsPanel").classList.add("open"); $("settingsOverlay").style.display = "block";
+  $("settingsName").value = S.contactName; $("settingsPin").value = S.pin;
+}
+function closeSettings() { $("settingsPanel").classList.remove("open"); $("settingsOverlay").style.display = "none"; }
+$("settingsOverlay").addEventListener("click", closeSettings);
+
+$("settingsDpFile").addEventListener("change", () => {
+  const f = $("settingsDpFile").files[0]; if(!f) return;
+  const r = new FileReader(); r.onload = e => { S.contactDp = e.target.result; applySettings(); }; r.readAsDataURL(f);
+});
+$("settingsBgFile").addEventListener("change", () => {
+  const f = $("settingsBgFile").files[0]; if(!f) return;
+  const r = new FileReader(); r.onload = e => { S.background = e.target.result; applySettings(); }; r.readAsDataURL(f);
+});
+$("settingsBgColor").addEventListener("input", () => { S.background = $("settingsBgColor").value; applySettings(); });
+$("settingsSaveBtn").addEventListener("click", () => {
+  S.contactName = $("settingsName").value.trim() || "Kushmitha";
+  S.pin = $("settingsPin").value.trim();
+  saveS(); applySettings(); closeSettings(); showToast("Settings saved ✓");
+});
+$("lockNowBtn").addEventListener("click", () => {
+  if (!S.pin) { showToast("Set a PIN first!"); return; }
+  S.locked = true; saveS(); closeSettings();
+  $("chatApp").style.display = "none"; $("lockScreen").style.display = "flex";
+});
+
+/* ── Firebase listener ── */
+let listening = false;
+function startListening() {
+  if (listening) return; listening = true;
+  db.ref("messages").orderByChild("timestamp").on("child_added", snap => {
+    renderMessage(snap.val()); scrollToBottom();
+  });
+}
+
+/* ── Render ── */
+let lastDate = "";
+function renderMessage(d) {
+  const date = new Date(d.timestamp || Date.now());
+  const ds = date.toLocaleDateString([], { weekday:"long", month:"short", day:"numeric" });
+  if (ds !== lastDate) {
+    lastDate = ds;
+    const chip = document.createElement("div");
+    chip.className = "date-chip"; chip.textContent = ds;
+    $("messages").appendChild(chip);
+  }
+  const wrap = document.createElement("div"); wrap.className = "msg-wrap " + (d.fromMe?"me":"them");
+  const bub  = document.createElement("div"); bub.className  = "bubble bubble-" + (d.fromMe?"me":"them");
+
+  if (d.type==="text") { bub.innerHTML = linkify(esc(d.text)); }
+  else if (d.type==="image") {
+    const img = document.createElement("img"); img.src = d.url; img.className = "media-img";
+    img.addEventListener("click", () => { $("lbImg").src = d.url; $("lightbox").style.display = "flex"; });
+    bub.appendChild(img);
+    if (d.caption) { const c=document.createElement("p"); c.className="media-caption"; c.textContent=d.caption; bub.appendChild(c); }
+  } else if (d.type==="video") {
+    const v = document.createElement("video"); v.src = d.url; v.controls = true; v.className = "media-vid"; bub.appendChild(v);
+  } else if (d.type==="audio") {
+    const a = document.createElement("audio"); a.src = d.url; a.controls = true; bub.appendChild(a);
+  } else if (d.type==="file") {
+    bub.innerHTML = `<a class="file-link" href="${d.url}" target="_blank" rel="noopener">📎 ${esc(d.fileName||"File")}</a>`;
+  }
+
+  const t = document.createElement("span"); t.className = "msg-time";
+  t.innerHTML = date.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}) + (d.fromMe?' <span class="tick read">✓✓</span>':"");
+  bub.appendChild(t); wrap.appendChild(bub); $("messages").appendChild(wrap);
+}
+
+/* ── Send text ── */
+async function sendText() {
+  const text = $("textInput").value.trim(); if (!text) return;
+  $("textInput").value = ""; $("textInput").style.height = "auto";
+  await db.ref("messages").push({ type:"text", text, fromMe:true, timestamp:Date.now() });
+  sendEmail("💬 Message", text);
+}
+$("sendBtn").addEventListener("click", sendText);
+$("textInput").addEventListener("keydown", e => { if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); sendText(); } });
+
+/* ── Attach ── */
+$("attachBtn").addEventListener("click", () => $("fileInput").click());
+$("fileInput").addEventListener("change", async () => {
+  for (const f of Array.from($("fileInput").files)) await processFile(f);
+  $("fileInput").value = "";
+});
+
+async function processFile(file) {
+  showToast("Uploading…");
+  const isImg = file.type.startsWith("image/");
+  const isVid = file.type.startsWith("video/");
+  const isAud = file.type.startsWith("audio/");
+  let url, type;
+  if (isImg) { url = await uploadImgBB(file); type = "image"; }
+  else        { url = await toDataURL(file);   type = isVid?"video":isAud?"audio":"file"; }
+  if (!url) { showToast("Upload failed — file may be too large."); return; }
+  await db.ref("messages").push({ type, url, fileName:file.name, fromMe:true, timestamp:Date.now() });
+  sendEmail("📎 Media", `Sent a ${type}: ${file.name}`);
+  showToast("Sent ✓");
+}
+
+async function uploadImgBB(file) {
+  const fd = new FormData(); fd.append("image", file);
+  try {
+    const r = await fetch(`https://api.imgbb.com/1/upload?key=${CONFIG.imgbbKey}`,{method:"POST",body:fd});
+    const j = await r.json();
+    return j?.data?.url || null;
+  } catch(e) { return null; }
+}
+
+function toDataURL(file) {
+  return new Promise((res,rej) => {
+    const r = new FileReader(); r.onload = e => res(e.target.result); r.onerror = rej; r.readAsDataURL(file);
+  });
+}
+
+/* ── Voice note ── */
+let recorder, chunks=[], recOn=false;
+$("audioBtn").addEventListener("click", async () => {
+  if (!recOn) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+      recorder = new MediaRecorder(stream); chunks = [];
+      recorder.ondataavailable = e => { if(e.data.size>0) chunks.push(e.data); };
+      recorder.onstop = async () => {
+        const blob = new Blob(chunks,{type:"audio/webm"});
+        const file = new File([blob],`voice_${Date.now()}.webm`,{type:"audio/webm"});
+        stream.getTracks().forEach(t=>t.stop());
+        const url = await toDataURL(file);
+        await db.ref("messages").push({type:"audio", url, fromMe:true, timestamp:Date.now()});
+        sendEmail("🎙 Voice Note","Sent a voice note");
+        showToast("Voice note sent ✓");
+      };
+      recorder.start(); recOn=true;
+      $("audioBtn").textContent="⏹"; $("audioBtn").classList.add("recording");
+      showToast("Recording… tap ⏹ to stop");
+    } catch(e){ showToast("Mic access denied"); }
+  } else {
+    recorder.stop(); recOn=false;
+    $("audioBtn").textContent="🎙"; $("audioBtn").classList.remove("recording");
+  }
+});
+
+/* ── Email ── */
+function sendEmail(subject, body) {
+  emailjs.send(CONFIG.emailjs.serviceId, CONFIG.emailjs.templateId, {
+    to_email:"jadhavkushmitha@gmail.com", from_email:"rahuljacob00@gmail.com",
+    subject, message:body, sent_at:new Date().toLocaleString()
+  }).catch(e=>console.warn("EmailJS:",e));
+}
+
+/* ── Lightbox ── */
+$("lightboxClose").addEventListener("click", () => { $("lightbox").style.display="none"; });
+$("lightbox").addEventListener("click", e => { if(e.target===$("lightbox")) $("lightbox").style.display="none"; });
+
+/* ── Toast ── */
+let tt;
+function showToast(msg,ms=2400){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove("show"),ms); }
+
+/* ── Helpers ── */
+const scrollToBottom = () => requestAnimationFrame(()=>{ $("chatBg").scrollTop=$("chatBg").scrollHeight; });
+const esc = t => String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const linkify = t => t.replace(/(\bhttps?:\/\/[^\s<]+)/g, u=>`<a class="chat-link" href="${u}" target="_blank" rel="noopener">${u}</a>`);
+
+/* ── Init ── */
+applySettings();
+checkLock();
+</script>
+</body>
+</html>
